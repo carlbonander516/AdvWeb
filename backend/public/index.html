@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Venues Overview</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Venues in Jönköping</h1>
+  <ul id="venue-list"></ul>
+
+  <script>
+    // Fetch the list of venues from the backend API
+    fetch('http://localhost:3000/api/venues')
+      .then(response => response.json())
+      .then(venues => {
+        const list = document.getElementById('venue-list');
+        venues.forEach(venue => {
+          const li = document.createElement('li');
+          li.textContent = venue.name + (venue.district ? ' (' + venue.district + ')' : '');
+          list.appendChild(li);
+        });
+      })
+      .catch(err => console.error('Error fetching venues:', err));
+  </script>
+</body>
+</html>
