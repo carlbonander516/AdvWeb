@@ -7,21 +7,148 @@
 </head>
 <body>
   <h1>Venues in Jönköping</h1>
+  
+  <!-- Sorting Controls -->
+  <div>
+    <label for="sort-select">Sort by: </label>
+    <select id="sort-select">
+      <option value="name">Name</option>
+      <option value="district">District</option>
+    </select>
+    <button id="sort-button">Sort</button>
+  </div>
+  
+  <!-- List of Venues -->
   <ul id="venue-list"></ul>
-
+  
+  <!-- Form to Add a New Venue -->
+  <h2>Add a New Venue</h2>
+  <form id="add-venue-form">
+    <input type="text" id="venue-name" placeholder="Name" required>
+    <input type="text" id="venue-url" placeholder="URL" required>
+    <input type="text" id="venue-district" placeholder="District">
+    <button type="submit">Add Venue</button>
+  </form>
+  
   <script>
-    // Fetch the list of venues from the backend API
-    fetch('http://localhost:3000/api/venues')
-      .then(response => response.json())
-      .then(venues => {
-        const list = document.getElementById('venue-list');
-        venues.forEach(venue => {
-          const li = document.createElement('li');
-          li.textContent = venue.name + (venue.district ? ' (' + venue.district + ')' : '');
-          list.appendChild(li);
-        });
+    let venues = [];
+
+    // Function to render venues on the page
+    function renderVenues() {
+      const list = document.getElementById('venue-list');
+      list.innerHTML = '';
+      venues.forEach(venue => {
+        const li = document.createElement('li');
+        li.textContent = venue.name + (venue.district ? ' (' + venue.district + ')' : '');
+
+        // Create an Edit button
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = () => editVenue(venue);
+
+        // Create a Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = () => deleteVenue(venue.id);
+
+        li.appendChild(editBtn);
+        li.appendChild(deleteBtn);
+        list.appendChild(li);
+      });
+    }
+
+    // Fetch venues from the API
+    function fetchVenues() {
+      fetch('/api/venues')
+        .then(response => response.json())
+        .then(data => {
+          venues = data;
+          renderVenues();
+        })
+        .catch(err => console.error('Error fetching venues:', err));
+    }
+
+    // Event listener to add a new venue
+    document.getElementById('add-venue-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const name = document.getElementById('venue-name').value;
+      const url = document.getElementById('venue-url').value;
+      const district = document.getElementById('venue-district').value;
+      const newVenue = { name, url, district };
+      fetch('/api/venues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVenue)
       })
-      .catch(err => console.error('Error fetching venues:', err));
+      .then(response => response.json())
+      .then(addedVenue => {
+        venues.push(addedVenue);
+        renderVenues();
+        document.getElementById('add-venue-form').reset();
+      })
+      .catch(err => console.error('Error adding venue:', err));
+    });
+
+    // Function to delete a venue
+    function deleteVenue(id) {
+      fetch(`/api/venues/${id}`, {
+        method: 'DELETE'
+      })
+      .then(response => response.json())
+      .then(deleted => {
+        venues = venues.filter(v => v.id !== id);
+        renderVenues();
+      })
+      .catch(err => console.error('Error deleting venue:', err));
+    }
+
+    // Function to edit a venue
+    function editVenue(venue) {
+      const newName = prompt("Enter new name:", venue.name);
+      const newDistrict = prompt("Enter new district:", venue.district || '');
+      if (newName !== null) {
+        fetch(`/api/venues/${venue.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName, district: newDistrict })
+        })
+        .then(response => response.json())
+        .then(updatedVenue => {
+          const index = venues.findIndex(v => v.id === venue.id);
+          if (index !== -1) {
+            venues[index] = updatedVenue;
+            renderVenues();
+          }
+        })
+        .catch(err => console.error('Error editing venue:', err));
+      }
+    }
+
+    // Sorting functionality
+    document.getElementById('sort-button').addEventListener('click', function() {
+      const sortKey = document.getElementById('sort-select').value;
+      venues.sort((a, b) => {
+        // Ensure we compare strings even if one value is missing
+        return (a[sortKey] || "").localeCompare(b[sortKey] || "");
+      });
+      renderVenues();
+    });
+
+    // Initial fetch of venues when page loads
+    fetchVenues();
   </script>
 </body>
 </html>
+
+
+<!-- 
+Varje gång du uppdaterar något starta om och rebuilda docker filen med dessa
+kommandon i terminalen för att se uppdateringen :) (i denna ordningen)
+
+docker stop node-app
+docker rm node-app
+docker build -f backend/Dockerfile -t my-node-app .
+docker run -d -p 3000:3000 --name node-app my-node-app
+
+docker-compose up --build
+ -->
