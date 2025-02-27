@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
 app.use(express.json());
 
 // Connect to MongoDB using environment variable or default
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/venuesdb';
+const mongoURI = process.env.MONGO_URI || 'mongodb://mongo-db:27017/venuesdb';
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -24,12 +24,24 @@ mongoose.connect(mongoURI, {
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Define a Mongoose schema and model for a Venue
+/* 
+ * Define a Mongoose schema and model for a Venue 
+ * with virtual options enabled
+ */
 const venueSchema = new mongoose.Schema({
   name: String,
   url: String,
   district: String
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
+
+// Create a virtual property 'id' that returns the string version of _id
+venueSchema.virtual('id').get(function() {
+  return this._id.toHexString();
+});
+
 const Venue = mongoose.model('Venue', venueSchema);
 
 // Optional: Seed the database if empty using the initial data from data/stores.json
@@ -45,8 +57,6 @@ const Venue = mongoose.model('Venue', venueSchema);
     console.error('Error seeding data:', err);
   }
 })();
-
-
 
 // REST API Endpoints:
 
@@ -74,28 +84,47 @@ app.post('/api/venues', async (req, res) => {
 // PUT: Update an existing venue by id
 app.put('/api/venues/:id', async (req, res) => {
   try {
-    const updatedVenue = await Venue.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (updatedVenue) {
-      res.json(updatedVenue);
-    } else {
-      res.status(404).json({ error: 'Venue not found' });
+    console.log("Update request for ID:", req.params.id);
+    console.log("Update data:", req.body);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      console.log("Invalid ID format:", req.params.id);
+      return res.status(400).json({ error: "Invalid venue ID format" });
     }
+    const updatedVenue = await Venue.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedVenue) {
+      console.log("Venue not found for ID:", req.params.id);
+      return res.status(404).json({ error: "Venue not found" });
+    }
+    console.log("Venue updated:", updatedVenue);
+    res.json(updatedVenue);
   } catch (err) {
-    res.status(500).json({ error: 'Error updating venue' });
+    console.error("Error updating venue:", err);
+    res.status(500).json({ error: "Error updating venue" });
   }
 });
 
 // DELETE: Remove a venue by id
 app.delete('/api/venues/:id', async (req, res) => {
   try {
-    const deletedVenue = await Venue.findByIdAndDelete(req.params.id);
-    if (deletedVenue) {
-      res.json(deletedVenue);
-    } else {
-      res.status(404).json({ error: 'Venue not found' });
+    console.log("Delete request for ID:", req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      console.log("Invalid ID format:", req.params.id);
+      return res.status(400).json({ error: "Invalid venue ID format" });
     }
+    const deletedVenue = await Venue.findByIdAndDelete(req.params.id);
+    if (!deletedVenue) {
+      console.log("Venue not found for ID:", req.params.id);
+      return res.status(404).json({ error: "Venue not found" });
+    }
+    console.log("Venue deleted:", deletedVenue);
+    res.json({ message: "Venue deleted successfully" });
   } catch (err) {
-    res.status(500).json({ error: 'Error deleting venue' });
+    console.error("Error deleting venue:", err);
+    res.status(500).json({ error: "Error deleting venue" });
   }
 });
 
