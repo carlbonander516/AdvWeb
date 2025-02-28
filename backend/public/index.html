@@ -60,13 +60,14 @@
     // Fetch venues from the API
     function fetchVenues() {
       fetch('/api/venues')
-        .then(response => response.json())
-        .then(data => {
-          venues = data;
-          renderVenues();
-        })
-        .catch(err => console.error('Error fetching venues:', err));
-    }
+      .then(response => response.json())
+      .then(data => {
+        console.log("Fetched venues:", data); // Log the data to inspect the IDs
+        venues = data;
+        renderVenues();
+    })
+    .catch(err => console.error('Error fetching venues:', err));
+}
 
     // Event listener to add a new venue
     document.getElementById('add-venue-form').addEventListener('submit', function(e) {
@@ -91,38 +92,50 @@
 
     // Function to delete a venue
     function deleteVenue(id) {
-      fetch(`/api/venues/${id}`, {
-        method: 'DELETE'
-      })
-      .then(response => response.json())
-      .then(deleted => {
-        venues = venues.filter(v => v.id !== id);
-        renderVenues();
-      })
-      .catch(err => console.error('Error deleting venue:', err));
-    }
+  fetch(`/api/venues/${id}`, {
+    method: 'DELETE'
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("Failed to delete");
+    return response.json();
+  })
+  .then(deleted => {
+    venues = venues.filter(v => v.id !== id);
+    renderVenues();
+  })
+  .catch(err => console.error('Error deleting venue:', err));
+}
+
 
     // Function to edit a venue
     function editVenue(venue) {
-      const newName = prompt("Enter new name:", venue.name);
-      const newDistrict = prompt("Enter new district:", venue.district || '');
-      if (newName !== null) {
-        fetch(`/api/venues/${venue.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newName, district: newDistrict })
-        })
-        .then(response => response.json())
-        .then(updatedVenue => {
-          const index = venues.findIndex(v => v.id === venue.id);
-          if (index !== -1) {
-            venues[index] = updatedVenue;
-            renderVenues();
-          }
-        })
-        .catch(err => console.error('Error editing venue:', err));
-      }
+  const newName = prompt("Enter new name:", venue.name);
+  const newDistrict = prompt("Enter new district:", venue.district || '');
+
+  if (!newName) return; // Stop if the user cancels
+
+  fetch(`/api/venues/${venue.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: newName,
+      url: venue.url, // Ensure URL is not lost
+      district: newDistrict
+    })
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("Failed to update venue");
+    return response.json();
+  })
+  .then(updatedVenue => {
+    const index = venues.findIndex(v => v.id === venue.id);
+    if (index !== -1) {
+      venues[index] = updatedVenue;
+      renderVenues();
     }
+  })
+  .catch(err => console.error('Error editing venue:', err));
+}
 
     // Sorting functionality
     document.getElementById('sort-button').addEventListener('click', function() {

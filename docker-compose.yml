@@ -1,23 +1,31 @@
 services:
-  mongo:
-    image: mongo:latest
-    container_name: mongo-db
+  postgres-db:
+    image: postgres:latest
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: postgres
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - mongo-data:/data/db
+      - pgdata:/var/lib/postgresql/data
 
-  app:
+  node-app:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: backend/Dockerfile  # Adjust the path if needed
     container_name: node-app
+    depends_on:
+      - postgres-db
     ports:
       - "3000:3000"
-    depends_on:
-      - mongo
     environment:
-      - MONGO_URI=mongodb://mongo:27017/venuesdb
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: 12345
+      DB_NAME: postgres
 
 volumes:
-  mongo-data:
+  pgdata:
