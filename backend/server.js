@@ -18,56 +18,25 @@ app.get('/', (req, res) => {
 // Middleware to parse JSON bodies for REST API calls
 app.use(express.json());
 
-// Configure PostgreSQL client
-const client = new Client({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '12345',
-  database: process.env.DB_NAME || 'postgres'
+// Connect to MongoDB using environment variable or default
+const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/venuesdb';
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Define a Mongoose schema and model for a Venue
+const venueSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  district: String
 });
+const Venue = mongoose.model('Venue', venueSchema);
 
-// JWT secret (not used in these endpoints since login is disabled for now)
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
-
-// Authentication middleware (currently not applied to PUT/DELETE)
-function authenticate(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-  const token = authHeader.split(' ')[1]; // Expecting format "Bearer <token>"
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token' });
-    req.user = decoded;
-    next();
-  });
-}
-
-// Function to initialize the database (create tables if they don't exist)
-async function initializeDatabase() {
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS venues (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        url VARCHAR(255),
-        district VARCHAR(255)
-      );
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL
-      );
-    `);
-    console.log('Tables ensured.');
-  } catch (err) {
-    console.error('Error creating tables:', err.stack);
-  }
-}
-
-// Function to seed venues if the table is empty
-async function seedVenues() {
+// Optional: Seed the database if empty using the initial data from data/stores.json
+(async () => {
   try {
     const result = await client.query('SELECT COUNT(*) FROM venues;');
     const count = parseInt(result.rows[0].count, 10);
@@ -86,7 +55,9 @@ async function seedVenues() {
   } catch (err) {
     console.error('Error seeding venues:', err.stack);
   }
-}
+})();
+
+
 
 /* 
  * REST API Endpoints for Venues 
@@ -121,109 +92,31 @@ app.post('/api/venues', async (req, res) => {
 // PUT: Update an existing venue by id (login requirement removed temporarily)
 app.put('/api/venues/:id', async (req, res) => {
   try {
-    console.log("Update request for ID:", req.params.id);
-    console.log("Update data:", req.body);
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid venue ID format' });
+    const updatedVenue = await Venue.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (updatedVenue) {
+      res.json(updatedVenue);
+    } else {
+      res.status(404).json({ error: 'Venue not found' });
     }
-    const { name, url, district } = req.body;
-    const result = await client.query(
-      'UPDATE venues SET name = $1, url = $2, district = $3 WHERE id = $4 RETURNING *;',
-      [name, url, district, id]
-    );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Venue not found' });
-    }
-    console.log("Venue updated:", result.rows[0]);
-    res.json(result.rows[0]);
   } catch (err) {
-    console.error("Error updating venue:", err.stack);
-    res.status(500).json({ error: "Error updating venue" });
+    res.status(500).json({ error: 'Error updating venue' });
   }
 });
 
 // DELETE: Remove a venue by id (login requirement removed temporarily)
 app.delete('/api/venues/:id', async (req, res) => {
   try {
-    console.log("Delete request for ID:", req.params.id);
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid venue ID format' });
+    const deletedVenue = await Venue.findByIdAndDelete(req.params.id);
+    if (deletedVenue) {
+      res.json(deletedVenue);
+    } else {
+      res.status(404).json({ error: 'Venue not found' });
     }
-    const result = await client.query(
-      'DELETE FROM venues WHERE id = $1 RETURNING *;',
-      [id]
-    );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Venue not found' });
-    }
-    console.log("Venue deleted:", result.rows[0]);
-    res.json({ message: 'Venue deleted successfully' });
   } catch (err) {
-    console.error("Error deleting venue:", err.stack);
-    res.status(500).json({ error: "Error deleting venue" });
+    res.status(500).json({ error: 'Error deleting venue' });
   }
 });
 
-/* 
- * REST API Endpoints for User Authentication (Still available, not applied to venue routes)
- */
-
-// Signup - Create a new account
-app.post('/api/signup', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const userCheck = await client.query('SELECT * FROM users WHERE username = $1;', [username]);
-    if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Username already exists' });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await client.query(
-      'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *;',
-      [username, hashedPassword]
-    );
-    res.status(201).json({ message: 'User created successfully' });
-  } catch (err) {
-    console.error('Error signing up:', err.stack);
-    res.status(500).json({ error: 'Error signing up' });
-  }
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
 });
-
-// Login - Authenticate a user and return a JWT
-app.post('/api/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const result = await client.query('SELECT * FROM users WHERE username = $1;', [username]);
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const user = result.rows[0];
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ message: 'Login successful', token });
-  } catch (err) {
-    console.error('Error logging in:', err.stack);
-    res.status(500).json({ error: 'Error logging in' });
-  }
-});
-
-// Start the server after connecting to PostgreSQL and ensuring tables exist
-const startServer = async () => {
-  try {
-    await client.connect();
-    console.log('Connected to PostgreSQL database');
-    await initializeDatabase();
-    await seedVenues();
-  } catch (err) {
-    console.error('Database connection error:', err.stack);
-  }
-  app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-  });
-};
-
-startServer();
