@@ -62,12 +62,12 @@
       fetch('/api/venues')
       .then(response => response.json())
       .then(data => {
-        console.log("Fetched venues:", data); // Log the data to inspect the IDs
+        console.log("Fetched venues:", data);
         venues = data;
         renderVenues();
-    })
-    .catch(err => console.error('Error fetching venues:', err));
-}
+      })
+      .catch(err => console.error('Error fetching venues:', err));
+    }
 
     // Event listener to add a new venue
     document.getElementById('add-venue-form').addEventListener('submit', function(e) {
@@ -92,56 +92,52 @@
 
     // Function to delete a venue
     function deleteVenue(id) {
-  fetch(`/api/venues/${id}`, {
-    method: 'DELETE'
-  })
-  .then(response => {
-    if (!response.ok) throw new Error("Failed to delete");
-    return response.json();
-  })
-  .then(deleted => {
-    venues = venues.filter(v => v.id !== id);
-    renderVenues();
-  })
-  .catch(err => console.error('Error deleting venue:', err));
-}
-
+      fetch(`/api/venues/${id}`, {
+        method: 'DELETE'
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Failed to delete");
+        return response.json();
+      })
+      .then(deleted => {
+        venues = venues.filter(v => v.id !== id);
+        renderVenues();
+      })
+      .catch(err => console.error('Error deleting venue:', err));
+    }
 
     // Function to edit a venue
     function editVenue(venue) {
-  const newName = prompt("Enter new name:", venue.name);
-  const newDistrict = prompt("Enter new district:", venue.district || '');
-
-  if (!newName) return; // Stop if the user cancels
-
-  fetch(`/api/venues/${venue.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: newName,
-      url: venue.url, // Ensure URL is not lost
-      district: newDistrict
-    })
-  })
-  .then(response => {
-    if (!response.ok) throw new Error("Failed to update venue");
-    return response.json();
-  })
-  .then(updatedVenue => {
-    const index = venues.findIndex(v => v.id === venue.id);
-    if (index !== -1) {
-      venues[index] = updatedVenue;
-      renderVenues();
+      const newName = prompt("Enter new name:", venue.name);
+      const newDistrict = prompt("Enter new district:", venue.district || '');
+      if (!newName) return;
+      fetch(`/api/venues/${venue.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          url: venue.url,
+          district: newDistrict
+        })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Failed to update venue");
+        return response.json();
+      })
+      .then(updatedVenue => {
+        const index = venues.findIndex(v => v.id === venue.id);
+        if (index !== -1) {
+          venues[index] = updatedVenue;
+          renderVenues();
+        }
+      })
+      .catch(err => console.error('Error editing venue:', err));
     }
-  })
-  .catch(err => console.error('Error editing venue:', err));
-}
 
     // Sorting functionality
     document.getElementById('sort-button').addEventListener('click', function() {
       const sortKey = document.getElementById('sort-select').value;
       venues.sort((a, b) => {
-        // Ensure we compare strings even if one value is missing
         return (a[sortKey] || "").localeCompare(b[sortKey] || "");
       });
       renderVenues();
@@ -152,16 +148,3 @@
   </script>
 </body>
 </html>
-
-
-<!-- 
-Varje gång du uppdaterar något starta om och rebuilda docker filen med dessa
-kommandon i terminalen för att se uppdateringen :) (i denna ordningen)
-
-docker stop node-app
-docker rm node-app
-docker build -f backend/Dockerfile -t my-node-app .
-docker run -d -p 3000:3000 --name node-app my-node-app
-
-docker-compose up --build
- -->
