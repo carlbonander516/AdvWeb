@@ -33,20 +33,41 @@
   <script>
     let venues = [];
 
-    // Function to render venues on the page
     function renderVenues() {
       const list = document.getElementById('venue-list');
       list.innerHTML = '';
       venues.forEach(venue => {
         const li = document.createElement('li');
-        li.textContent = venue.name + (venue.district ? ' (' + venue.district + ')' : '');
 
-        // Create an Edit button
+        // Create a clickable element if URL exists, else plain text
+        let nameElement;
+        if (venue.url) {
+          let link = venue.url;
+          // If link doesn't start with http:// or https://, prepend protocol-relative prefix
+          if (!link.startsWith('http://') && !link.startsWith('https://')) {
+            link = '//' + link;
+          }
+          nameElement = document.createElement('a');
+          nameElement.href = link;
+          nameElement.textContent = venue.name;
+          nameElement.target = '_blank'; // Open link in a new tab
+        } else {
+          nameElement = document.createTextNode(venue.name);
+        }
+        li.appendChild(nameElement);
+    
+        // Append district if available
+        if (venue.district) {
+          const districtSpan = document.createElement('span');
+          districtSpan.textContent = ' (' + venue.district + ')';
+          li.appendChild(districtSpan);
+        }
+    
+        // Create Edit and Delete buttons
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Edit';
         editBtn.onclick = () => editVenue(venue);
 
-        // Create a Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'Delete';
         deleteBtn.onclick = () => deleteVenue(venue.id);
@@ -56,6 +77,8 @@
         list.appendChild(li);
       });
     }
+
+
 
     // Fetch venues from the API
     function fetchVenues() {
@@ -106,9 +129,9 @@
       .catch(err => console.error('Error deleting venue:', err));
     }
 
-    // Function to edit a venue
     function editVenue(venue) {
       const newName = prompt("Enter new name:", venue.name);
+      const newUrl = prompt("Enter new URL:", venue.url);
       const newDistrict = prompt("Enter new district:", venue.district || '');
       if (!newName) return;
       fetch(`/api/venues/${venue.id}`, {
@@ -116,7 +139,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newName,
-          url: venue.url,
+          url: newUrl,
           district: newDistrict
         })
       })
@@ -133,6 +156,7 @@
       })
       .catch(err => console.error('Error editing venue:', err));
     }
+
 
     // Sorting functionality
     document.getElementById('sort-button').addEventListener('click', function() {
